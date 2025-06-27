@@ -1,22 +1,31 @@
-FROM alpine:latest
+FROM php:8.1-apache
 
-COPY ./ /var/www/html/
-COPY entrypoint.sh /opt/entrypoint.sh
+# Install required PHP extensions
+RUN apt-get update && apt-get install -y \
+    git \
+    unzip \
+    php-mbstring \
+    php-xml \
+    php-curl \
+    php-cli \
+    php-zip \
+    curl \
+    && docker-php-ext-install pdo pdo_mysql
 
-RUN apk --update add \
-    curl php-apache2 php-cli php-json php-mbstring php-phar php-openssl && \
-    rm -f /var/cache/apk/* && \
-    chmod +x /opt/entrypoint.sh && \
-    curl -sS https://getcomposer.org/installer | php -- \
-    --install-dir=/usr/local/bin --filename=composer && \
-	composer install --working-dir=/var/www/html && \
-    mkdir -p /var/www/html/ && chown -R apache:apache /var/www/html
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-COPY configs/httpd.conf /etc/apache2/httpd.conf
-COPY configs/app.conf /etc/apache2/sites/
-COPY configs/php.ini /etc/php7/php.ini
+# Copy app files
+COPY . /var/www/html
 
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html
+
+# Enable Apache mod_rewrite
+RUN a2enmod rewrite
+
+# Expose port
 EXPOSE 80
 
-WORKDIR /var/www/html/
-ENTRYPOINT [ "/opt/entrypoint.sh" ]
+# Start Apache
+CMD ["apache2-foreground"]
